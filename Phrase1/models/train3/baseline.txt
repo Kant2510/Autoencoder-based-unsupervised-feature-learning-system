@@ -1,0 +1,45 @@
+========== Epoch 1/5 ==========
+Average Loss: 0.0204744
+Epoch Time:  23.37 seconds
+Average Batch Time: 29.6525 ms
+Throughput: 2141.55 images/second
+Batch Size: 64
+Num Batches: 782
+==========================================
+
+========== Epoch 2/5 ==========
+Average Loss: 0.00921367
+Epoch Time:  22.9216 seconds
+Average Batch Time: 29.2103 ms
+Throughput: 2183.44 images/second
+Batch Size: 64
+Num Batches: 782
+==========================================
+
+========== Epoch 3/5 ==========
+Average Loss: 0.00779345
+Epoch Time:  21.8754 seconds
+Average Batch Time: 27.8704 ms
+Throughput: 2287.87 images/second
+Batch Size: 64
+Num Batches: 782
+==========================================
+
+========== Epoch 4/5 ==========
+Average Loss: 0.00727171
+Epoch Time:  23.4745 seconds
+Average Batch Time: 29.9138 ms
+Throughput: 2132.02 images/second
+Batch Size: 64
+Num Batches: 782
+==========================================
+
+========== Epoch 5/5 ==========
+Average Loss: 0.00669335
+Epoch Time:  23.4712 seconds
+Average Batch Time: 29.9153 ms
+Throughput: 2132.31 images/second
+Batch Size: 64
+Num Batches: 782
+==========================================
+

@@ -1,0 +1,27 @@
+========== Epoch 1/3 ==========
+Average Loss: 0.0245721
+Epoch Time:  23.2169 seconds
+Average Batch Time: 29.4584 ms
+Throughput: 2155.67 images/second
+Batch Size: 64
+Num Batches: 782
+==========================================
+
+========== Epoch 2/3 ==========
+Average Loss: 0.0158676
+Epoch Time:  21.9065 seconds
+Average Batch Time: 27.9179 ms
+Throughput: 2284.62 images/second
+Batch Size: 64
+Num Batches: 782
+==========================================
+
+========== Epoch 3/3 ==========
+Average Loss: 0.010081
+Epoch Time:  21.9129 seconds
+Average Batch Time: 27.9265 ms
+Throughput: 2283.96 images/second
+Batch Size: 64
+Num Batches: 782
+==========================================
+
