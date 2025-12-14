@@ -2,6 +2,30 @@
 #include <fstream>
 #include "autoencoder.h"
 
+// Hàm này nhận vào Gradient từ lớp sau và Output của lớp Conv hiện tại
+Tensor compute_relu_gradient(const Tensor &grad_output, const Tensor &fused_conv_output)
+{
+    // 1. Tạo Tensor kết quả (grad_input cho Conv)
+    Tensor grad_input(grad_output.batch, grad_output.channels, grad_output.height, grad_output.width);
+    grad_input.allocate_device();
+
+    // 2. Gọi Kernel
+    int total = grad_output.numel();
+    int threads = 256;
+    int blocks = (total + threads - 1) / threads;
+
+    relu_backward_kernel_2<<<blocks, threads>>>(
+        grad_output.d_data,       // dL/dy
+        fused_conv_output.d_data, // y (Dùng làm mask)
+        grad_input.d_data,        // dL/dx (Kết quả trả về)
+        total);
+
+    CHECK_CUDA(cudaDeviceSynchronize());
+    CHECK_CUDA(cudaGetLastError());
+
+    return grad_input;
+}
+
 Autoencoder::Autoencoder()
     : conv1(3, 256, 3, 1, 1),
       conv2(256, 128, 3, 1, 1),
@@ -15,24 +39,28 @@ Autoencoder::Autoencoder()
 Tensor Autoencoder::forward(const Tensor &input, const std::string &device)
 {
     auto x = conv1.forward(input, device);
-    x = relu1.forward(x, device);
+    out_conv1 = x; // Lưu output của conv1
+    // x = relu1.forward(x, device);
     x = pool1.forward(x, device);
 
     x = conv2.forward(x, device);
-    x = relu2.forward(x, device);
+    out_conv2 = x; // Lưu output của conv2
+    // x = relu2.forward(x, device);
     x = pool2.forward(x, device);
 
     Tensor encoded = x; // Lưu mã hóa trung gian
 
     x = conv3.forward(encoded, device);
-    x = relu3.forward(x, device);
+    out_conv3 = x; // Lưu output của conv3
+    // x = relu3.forward(x, device);
     x = upsample1.forward(x, device);
 
     x = conv4.forward(x, device);
-    x = relu4.forward(x, device);
+    out_conv4 = x; // Lưu output của conv4
+    // x = relu4.forward(x, device);
     x = upsample2.forward(x, device);
 
-    x = conv5.forward(x, device);
+    x = conv5.forward(x, device, false); // Lớp cuối không dùng ReLU
 
     return x;
 }
@@ -59,19 +87,26 @@ Tensor Autoencoder::backward(const Tensor &grad_output, float learning_rate, con
     auto grad = conv5.backward(grad_output, device);
 
     grad = upsample2.backward(grad, device);
-    grad = relu4.backward(grad, device);
+    // grad = relu4.backward(grad, device);
+    // Bước A: Tính gradient xuyên qua ReLU bằng cách dùng output của Conv4
+    // out_conv4 ở đây đóng vai trò làm mask
+    grad = compute_relu_gradient(grad, out_conv4);
+    // Bước B: Truyền gradient đã lọc qua ReLU vào Conv4 Backward
     grad = conv4.backward(grad, device);
 
     grad = upsample1.backward(grad, device);
-    grad = relu3.backward(grad, device);
+    // grad = relu3.backward(grad, device);
+    grad = compute_relu_gradient(grad, out_conv3);
     grad = conv3.backward(grad, device);
 
     grad = pool2.backward(grad, device);
-    grad = relu2.backward(grad, device);
+    // grad = relu2.backward(grad, device);
+    grad = compute_relu_gradient(grad, out_conv2);
     grad = conv2.backward(grad, device);
 
     grad = pool1.backward(grad, device);
-    grad = relu1.backward(grad, device);
+    // grad = relu1.backward(grad, device);
+    grad = compute_relu_gradient(grad, out_conv1);
     grad = conv1.backward(grad, device);
 
     conv1.updateWeights(learning_rate, device);

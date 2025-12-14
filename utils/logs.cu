@@ -48,3 +48,39 @@ void logBaseline(
 
 	out.close();
 }
+
+// style: [=========>......] 50% Loss: 0.1234 Time: 15ms
+void drawProgressBar(int current, int total, float current_loss, double batch_time_ms, int barWidth)
+{
+	float progress = (float)current / total;
+	int pos = barWidth * progress;
+
+	std::cout << "\r"; // Quay về đầu dòng
+	std::cout << "[";
+
+	for (int i = 0; i < barWidth; ++i)
+	{
+		if (i < pos)
+			std::cout << "=";
+		else if (i == pos)
+			std::cout << ">";
+		else
+			std::cout << ".";
+	}
+
+	std::cout << "] " << int(progress * 100.0) << "% ";
+	std::cout << current << "/" << total << " ";
+	std::cout << "Loss: " << std::fixed << std::setprecision(4) << current_loss << " ";
+
+	// Hiển thị thời gian/batch
+	if (batch_time_ms > 1000.0)
+	{
+		std::cout << "| " << std::setprecision(2) << batch_time_ms / 1000.0 << "s/step";
+	}
+	else
+	{
+		std::cout << "| " << std::setprecision(0) << batch_time_ms << "ms/step";
+	}
+
+	std::cout << std::flush; // Bắt buộc phải flush để in ngay lập tức
+}

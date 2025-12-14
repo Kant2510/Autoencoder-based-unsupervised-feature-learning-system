@@ -237,13 +237,22 @@ void train(int BATCH_SIZE, int EPOCHS, float LEARNING_RATE, int LIMIT, const std
 			model.backward(grad, LEARNING_RATE, "device");
 
 			auto b1 = std::chrono::high_resolution_clock::now();
-			total_batch_time_ms += std::chrono::duration<double, std::milli>(b1 - b0).count();
+			double step_time = std::chrono::duration<double, std::milli>(b1 - b0).count();
+			total_batch_time_ms += step_time;
 
-			if ((batch_idx + 1) % 100 == 0)
-			{
-				std::cout << "  Batch [" << batch_idx + 1 << "/" << num_batches
-						  << "] Loss: " << batch_loss << std::endl;
-			}
+			// if ((batch_idx + 1) % 100 == 0)
+			// {
+			// 	std::cout << "  Batch [" << batch_idx + 1 << "/" << num_batches
+			// 			  << "] Loss: " << batch_loss << std::endl;
+			// }
+			// --- CẬP NHẬT THANH TIẾN TRÌNH ---
+			// Gọi hàm vẽ bar mỗi batch (hoặc mỗi n batch nếu muốn giảm lag console)
+			drawProgressBar(batch_idx + 1, num_batches, batch_loss, step_time);
+
+			// Giải phóng bộ nhớ tạm trong vòng lặp (Rất quan trọng để tránh đầy VRAM)
+			batch.free_device();
+			output.free_device();
+			grad.free_device();
 		}
 
 		auto epoch_end = std::chrono::high_resolution_clock::now();
@@ -340,12 +349,39 @@ int main(int argc, char *argv[])
 
 	// // Test Autoencoder forward
 	// Tensor output = test_forward(input);
-	int batch_size = 64;
-	int epochs = 5;
-	float lr = 0.1f;
+	int batch_size = 32;
+	int epochs = 7;
+	float lr = 0.004f;
 	// 2% of data
-	int data_limit = -1;
+	int data_limit = 1024;
 	std::string load_path = "";
+
+	// Parse command-line arguments
+	for (int i = 1; i < argc; i++)
+	{
+		std::string arg = argv[i];
+
+		if (arg == "--batch" && i + 1 < argc)
+		{
+			batch_size = std::atoi(argv[++i]);
+		}
+		else if (arg == "--epochs" && i + 1 < argc)
+		{
+			epochs = std::atoi(argv[++i]);
+		}
+		else if (arg == "--lr" && i + 1 < argc)
+		{
+			lr = std::atof(argv[++i]);
+		}
+		else if (arg == "--limit" && i + 1 < argc)
+		{
+			data_limit = std::atoi(argv[++i]);
+		}
+		else if (arg == "--load" && i + 1 < argc)
+		{
+			load_path = argv[++i];
+		}
+	}
 
 	std::cout << "CIFAR-10 Autoencoder - CPU Implementation" << std::endl;
 	std::cout << "=========================================\n"

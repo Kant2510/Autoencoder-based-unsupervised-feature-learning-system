@@ -67,7 +67,7 @@ Tensor MSELoss::backward(const Tensor &output, const Tensor &target, std::string
         CHECK_CUDA(cudaDeviceSynchronize());
         CHECK_CUDA(cudaGetLastError());
 
-        grad.to_host();
+        // grad.to_host();
         return grad;
     }
 

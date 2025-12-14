@@ -39,7 +39,7 @@ Conv2D::Conv2D(int in_c, int out_c, int k_size, int s, int p)
 	grad_bias.zeros("device");
 }
 
-Tensor Conv2D::forward(const Tensor &input, const std::string &device)
+Tensor Conv2D::forward(const Tensor &input, const std::string &device, const bool use_relu)
 {
 	this->last_input = input;
 
@@ -57,12 +57,12 @@ Tensor Conv2D::forward(const Tensor &input, const std::string &device)
 
 	if (device == "host")
 	{
-		forward_loop_host(input, output, batch_size, input_h, input_w, output_h, output_w);
+		forward_loop_host(input, output, batch_size, input_h, input_w, output_h, output_w, use_relu);
 	}
 	else if (device == "device")
 	{
 		output.allocate_device();
-		forward_loop_device(input, output, batch_size, input_h, input_w, output_h, output_w);
+		forward_loop_device(input, output, batch_size, input_h, input_w, output_h, output_w, use_relu);
 	}
 	else
 	{
@@ -72,7 +72,7 @@ Tensor Conv2D::forward(const Tensor &input, const std::string &device)
 	return output;
 }
 
-void Conv2D::forward_loop_host(const Tensor &input, Tensor &output, int batch_size, int input_h, int input_w, int output_h, int output_w)
+void Conv2D::forward_loop_host(const Tensor &input, Tensor &output, int batch_size, int input_h, int input_w, int output_h, int output_w, const bool use_relu)
 {
 	// VÒNG LẶP CHÍNH (7 Loop lồng nhau - Rất chậm trên CPU nhưng dễ hiểu)
 	for (int b = 0; b < batch_size; ++b)
@@ -107,15 +107,24 @@ void Conv2D::forward_loop_host(const Tensor &input, Tensor &output, int batch_si
 							}
 						}
 					}
+					if (use_relu)
+					{
+						// Áp dụng ReLU
+						sum = std::max(0.0f, sum + bias.at(0, oc, 0, 0));
+					}
+					else
+					{
+						sum += bias.at(0, oc, 0, 0);
+					}
 					// Gán vào output (cộng bias)
-					output.at(b, oc, oh, ow) = sum + bias.at(0, oc, 0, 0);
+					output.at(b, oc, oh, ow) = sum;
 				}
 			}
 		}
 	}
 }
 
-void Conv2D::forward_loop_device(const Tensor &input, Tensor &output, int batch_size, int input_h, int input_w, int output_h, int output_w)
+void Conv2D::forward_loop_device(const Tensor &input, Tensor &output, int batch_size, int input_h, int input_w, int output_h, int output_w, const bool use_relu)
 {
 	if (input.d_data == nullptr || weights.d_data == nullptr || bias.d_data == nullptr || output.d_data == nullptr)
 	{
@@ -124,32 +133,34 @@ void Conv2D::forward_loop_device(const Tensor &input, Tensor &output, int batch_
 	}
 
 	// Cấu hình kernel CUDA
-	// dim3 blockSize(16, 16);
-	// dim3 gridSize((output_w + blockSize.x - 1) / blockSize.x,
-	// 			  (output_h + blockSize.y - 1) / blockSize.y,
-	// 			  batch_size * out_channels);
-	int total = output.numel();
+	dim3 blockSize(16, 16);
+	dim3 gridSize(
+		(output_w + blockSize.x - 1) / blockSize.x, // Trục X: Bao phủ chiều rộng Output
+		(output_h + blockSize.y - 1) / blockSize.y, // Trục Y: Bao phủ chiều cao Output
+		batch_size * out_channels					// Trục Z: Bao phủ (Batch * Output Channels)
+	);
+	// int total = output.numel();
 
-	dim3 blockSize(256);
-	dim3 gridSize((total + blockSize.x - 1) / blockSize.x);
+	// dim3 blockSize(256);
+	// dim3 gridSize((total + blockSize.x - 1) / blockSize.x);
 
 	// Gọi kernel CUDA
-	conv2d_forward_kernel<<<gridSize, blockSize>>>(
+	conv2d_optimized_kernel<<<gridSize, blockSize>>>(
 		input.d_data,
-		weights.d_data,
-		bias.d_data,
 		output.d_data,
+		weights.d_data,
 		batch_size,
 		in_channels, out_channels,
 		input_h, input_w,
 		output_h, output_w,
-		kernel_size, stride, padding);
+		kernel_size, stride, padding,
+		use_relu);
 
 	CHECK_CUDA(cudaDeviceSynchronize());
 	CHECK_CUDA(cudaGetLastError());
 
 	// Chuyển kết quả về CPU (nếu cần)
-	output.to_host();
+	// output.to_host();
 }
 
 Tensor Conv2D::backward(const Tensor &grad_output, const std::string &device)
@@ -225,34 +236,70 @@ void Conv2D::backward_loop_host(const Tensor &grad_output, Tensor &grad_input, i
 
 void Conv2D::backward_loop_device(const Tensor &grad_output, Tensor &grad_input, int batch_size, int input_h, int input_w, int output_h, int output_w)
 {
-	// 3. Tính dX (Gradient Input)
-	int n_input = grad_input.numel();
-	conv2d_backward_input_kernel<<<GET_BLOCKS(n_input, 256), 256>>>(
-		grad_output.d_data, weights.d_data, grad_input.d_data,
-		batch_size, in_channels, out_channels,
-		last_input.height, last_input.width, output_h, output_w,
-		kernel_size, stride, padding);
+	// -----------------------------------------------------------------------
+	// 1. Tính dX (Gradient Input) - Dùng Grid 3D
+	// -----------------------------------------------------------------------
+	// Cần reset grad_input về 0 nếu kernel dùng cộng dồn,
+	// nhưng kernel dX của ta GHI ĐÈ (assign) nên không cần cudaMemset.
 
-	// 4. Tính dW (Gradient Weights)
-	int n_weights = grad_weights.numel();
-	conv2d_backward_weight_kernel<<<GET_BLOCKS(n_weights, 256), 256>>>(
-		last_input.d_data, grad_output.d_data, grad_weights.d_data,
-		batch_size, in_channels, out_channels,
-		last_input.height, last_input.width, output_h, output_w,
-		kernel_size, stride, padding);
+	dim3 blockSize(16, 16);
+	dim3 gridSizeInput(
+		(input_w + blockSize.x - 1) / blockSize.x,
+		(input_h + blockSize.y - 1) / blockSize.y,
+		batch_size * in_channels // Trục Z bao phủ Batch * Input Channels
+	);
 
-	// 5. Tính db (Gradient Bias)
-	conv2d_backward_bias_kernel<<<GET_BLOCKS(out_channels, 256), 256>>>(
-		grad_output.d_data, grad_bias.d_data,
+	conv2d_backward_input_shared_kernel<<<gridSizeInput, blockSize>>>(
+		grad_output.d_data,
+		weights.d_data,
+		grad_input.d_data,
+		batch_size, in_channels, out_channels,
+		input_h, input_w, output_h, output_w,
+		kernel_size, stride, padding);
+	CHECK_CUDA(cudaGetLastError());
+
+	// -----------------------------------------------------------------------
+	// 2. Tính dW (Gradient Weights)
+	// -----------------------------------------------------------------------
+	int total_weights = out_channels * in_channels * kernel_size * kernel_size;
+	int threadsW = 256;
+	int blocksW = (total_weights + threadsW - 1) / threadsW;
+
+	conv2d_backward_weight_kernel_opt<<<blocksW, threadsW>>>(
+		last_input.d_data,
+		grad_output.d_data,
+		grad_weights.d_data,
+		batch_size, in_channels, out_channels,
+		input_h, input_w, output_h, output_w,
+		kernel_size, stride, padding,
+		total_weights);
+	CHECK_CUDA(cudaGetLastError());
+
+	// -----------------------------------------------------------------------
+	// 3. Tính db (Gradient Bias) - Dùng Atomic
+	// -----------------------------------------------------------------------
+	// Reset grad_bias về 0 trước vì ta dùng atomicAdd
+	CHECK_CUDA(cudaMemset(grad_bias.d_data, 0, grad_bias.numel() * sizeof(float)));
+
+	// Grid 3D phủ toàn bộ output map
+	dim3 gridSizeBias(
+		(output_w + blockSize.x - 1) / blockSize.x,
+		(output_h + blockSize.y - 1) / blockSize.y,
+		batch_size * out_channels);
+
+	conv2d_backward_bias_kernel_atomic<<<gridSizeBias, blockSize>>>(
+		grad_output.d_data,
+		grad_bias.d_data,
 		batch_size, out_channels, output_h, output_w);
 
+	// Đồng bộ hóa cuối cùng
 	CHECK_CUDA(cudaDeviceSynchronize());
 	CHECK_CUDA(cudaGetLastError());
 
 	// Chuyển kết quả về CPU (nếu cần)
-	grad_input.to_host();
-	grad_weights.to_host();
-	grad_bias.to_host();
+	// grad_input.to_host();
+	// grad_weights.to_host();
+	// grad_bias.to_host();
 }
 
 void Conv2D::updateWeights(float learning_rate, const std::string &device)
@@ -278,8 +325,8 @@ void Conv2D::updateWeights(float learning_rate, const std::string &device)
 		CHECK_CUDA(cudaGetLastError());
 
 		// Chuyển weights và bias đã cập nhật về CPU (nếu cần)
-		weights.to_host();
-		bias.to_host();
+		// weights.to_host();
+		// bias.to_host();
 	}
 	else if (device == "host")
 	{

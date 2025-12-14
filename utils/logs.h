@@ -20,3 +20,6 @@ void logBaseline(
 	double throughput_img_per_sec,
 	int batch_size,
 	int num_batches);
+
+// style: [=========>......] 50% Loss: 0.1234 Time: 15ms
+void drawProgressBar(int current, int total, float current_loss, double batch_time_ms, int barWidth = 30);

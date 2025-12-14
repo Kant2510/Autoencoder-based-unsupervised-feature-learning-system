@@ -19,15 +19,15 @@ public:
 
 	// Hàm Forward
 	// input: mảng phẳng chứa batch_size ảnh
-	Tensor forward(const Tensor &input, const std::string &device = "host");
+	Tensor forward(const Tensor &input, const std::string &device = "host", const bool use_relu = true);
 	// Hàm Backward (tính gradient)
 	Tensor backward(const Tensor &grad_output, const std::string &device = "host");
 	// Cập nhật trọng số
 	void updateWeights(float learning_rate, const std::string &device = "host");
 	// Forward loop on host
-	void forward_loop_host(const Tensor &input, Tensor &output, int batch_size, int input_h, int input_w, int output_h, int output_w);
+	void forward_loop_host(const Tensor &input, Tensor &output, int batch_size, int input_h, int input_w, int output_h, int output_w, const bool use_relu);
 	// Forward loop on device
-	void forward_loop_device(const Tensor &input, Tensor &output, int batch_size, int input_h, int input_w, int output_h, int output_w);
+	void forward_loop_device(const Tensor &input, Tensor &output, int batch_size, int input_h, int input_w, int output_h, int output_w, const bool use_relu);
 	// Backward loop on host
 	void backward_loop_host(const Tensor &grad_output, Tensor &grad_input, int batch_size, int input_h, int input_w, int output_h, int output_w);
 	// Backward loop on device

@@ -5,7 +5,7 @@ Tensor ReLU::forward(const Tensor &input, const std::string &device)
 	this->last_input = input;
 
 	Tensor output(input.batch, input.channels, input.height, input.width);
-	
+
 	if (device == "host")
 	{
 		for (size_t i = 0; i < output.h_data.size(); i++)
@@ -28,7 +28,7 @@ Tensor ReLU::forward(const Tensor &input, const std::string &device)
 		CHECK_CUDA(cudaDeviceSynchronize());
 		CHECK_CUDA(cudaGetLastError());
 
-		output.to_host(); // Copy result back to host
+		// output.to_host(); // Copy result back to host
 	}
 	else
 	{
@@ -41,7 +41,7 @@ Tensor ReLU::forward(const Tensor &input, const std::string &device)
 Tensor ReLU::backward(const Tensor &grad_output, const std::string &device)
 {
 	Tensor grad_input(grad_output.batch, grad_output.channels, grad_output.height, grad_output.width);
-	
+
 	if (device == "host")
 	{
 		for (size_t i = 0; i < grad_input.h_data.size(); i++)
@@ -65,7 +65,7 @@ Tensor ReLU::backward(const Tensor &grad_output, const std::string &device)
 		CHECK_CUDA(cudaDeviceSynchronize());
 		CHECK_CUDA(cudaGetLastError());
 
-		grad_input.to_host(); // Copy result back to host
+		// grad_input.to_host(); // Copy result back to host
 	}
 	else
 	{

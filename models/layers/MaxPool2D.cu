@@ -109,7 +109,7 @@ void MaxPool2D::forward_loop_device(const Tensor &input, Tensor &output, int cha
 	CHECK_CUDA(cudaDeviceSynchronize());
 	CHECK_CUDA(cudaGetLastError());
 
-	output.to_host();
+	// output.to_host();
 }
 
 Tensor MaxPool2D::backward(const Tensor &grad_output, const std::string &device)
@@ -186,5 +186,5 @@ void MaxPool2D::backward_loop_device(const Tensor &grad_output, Tensor &grad_inp
 	CHECK_CUDA(cudaDeviceSynchronize());
 	CHECK_CUDA(cudaGetLastError());
 
-	grad_input.to_host();
+	// grad_input.to_host();
 }

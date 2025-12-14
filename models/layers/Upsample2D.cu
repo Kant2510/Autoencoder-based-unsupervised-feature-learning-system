@@ -71,7 +71,7 @@ void Upsample2D::forward_loop_device(const Tensor &input, Tensor &output,
 	CHECK_CUDA(cudaDeviceSynchronize());
 	CHECK_CUDA(cudaGetLastError());
 
-	output.to_host(); // Copy result back to host if needed
+	// output.to_host(); // Copy result back to host if needed
 }
 
 Tensor Upsample2D::backward(const Tensor &grad_output, const std::string &device)
@@ -150,5 +150,5 @@ void Upsample2D::backward_loop_device(const Tensor &grad_output, Tensor &grad_in
 	CHECK_CUDA(cudaDeviceSynchronize());
 	CHECK_CUDA(cudaGetLastError());
 
-	grad_input.to_host(); // Copy result back to host if needed
+	// grad_input.to_host(); // Copy result back to host if needed
 }

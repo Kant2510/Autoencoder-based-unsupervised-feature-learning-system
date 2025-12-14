@@ -11,7 +11,9 @@ class Autoencoder
 {
 private:
     Conv2D conv1, conv2, conv3, conv4, conv5;
-    ReLU relu1, relu2, relu3, relu4;
+    // Cần thêm biến để lưu output của các lớp Conv (vì class Conv2D mặc định chỉ lưu last_input)
+    Tensor out_conv1, out_conv2, out_conv3, out_conv4, out_conv5;
+    // ReLU relu1, relu2, relu3, relu4;
     MaxPool2D pool1, pool2;
     Upsample2D upsample1, upsample2;
 

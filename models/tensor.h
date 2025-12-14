@@ -101,6 +101,6 @@ public:
     {
         // Lưu ý: Trong thực tế C++, cần cẩn thận với copy constructor để tránh double free.
         // Ở code mẫu này tôi để việc free thủ công hoặc quản lý ở lớp cao hơn.
-        free_device();
+        // free_device();
     }
 };
