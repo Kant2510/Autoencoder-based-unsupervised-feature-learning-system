@@ -17,19 +17,21 @@ Conv2D::Conv2D(int in_c, int out_c, int k_size, int s, int p)
 
 	weights = Tensor(out_channels, in_channels, kernel_size, kernel_size);
 	bias = Tensor(1, out_channels, 1, 1);
-	grad_weights = Tensor(out_channels, in_channels, kernel_size, kernel_size);
-	grad_bias = Tensor(1, out_channels, 1, 1);
+	// grad_weights = Tensor(out_channels, in_channels, kernel_size, kernel_size);
+	// grad_bias = Tensor(1, out_channels, 1, 1);
+	grad_weights.reshape_if_needed(out_channels, in_channels, kernel_size, kernel_size);
+	grad_bias.reshape_if_needed(1, out_channels, 1, 1);
 
 	for (auto &w : weights.h_data)
 		w = distribution(generator);
 	bias.zeros();
-	grad_weights.zeros();
-	grad_bias.zeros();
+	// grad_weights.zeros();
+	// grad_bias.zeros();
 
 	weights.allocate_device();
 	bias.allocate_device();
-	grad_weights.allocate_device();
-	grad_bias.allocate_device();
+	// grad_weights.allocate_device();
+	// grad_bias.allocate_device();
 
 	// Copy initialized weights and bias to device
 	weights.to_device();
@@ -53,23 +55,26 @@ Tensor Conv2D::forward(const Tensor &input, const std::string &device, const boo
 	int output_w = (input_w - kernel_size + 2 * padding) / stride + 1;
 
 	// Cấp phát bộ nhớ cho output
-	Tensor output(batch_size, out_channels, output_h, output_w);
+	// Tensor output(batch_size, out_channels, output_h, output_w);
+	// 2. Thay vì: Tensor output(...); output.allocate_device();
+	// Ta dùng: Reshape và Ensure Memory trên biến cached
+	this->cached_output.reshape_if_needed(batch_size, out_channels, output_h, output_w);
 
 	if (device == "host")
 	{
-		forward_loop_host(input, output, batch_size, input_h, input_w, output_h, output_w, use_relu);
+		forward_loop_host(input, this->cached_output, batch_size, input_h, input_w, output_h, output_w, use_relu);
 	}
 	else if (device == "device")
 	{
-		output.allocate_device();
-		forward_loop_device(input, output, batch_size, input_h, input_w, output_h, output_w, use_relu);
+		// output.allocate_device();
+		forward_loop_device(input, this->cached_output, batch_size, input_h, input_w, output_h, output_w, use_relu);
 	}
 	else
 	{
 		throw std::invalid_argument("Invalid device specified for Conv2D forward");
 	}
 
-	return output;
+	return this->cached_output;
 }
 
 void Conv2D::forward_loop_host(const Tensor &input, Tensor &output, int batch_size, int input_h, int input_w, int output_h, int output_w, const bool use_relu)
@@ -165,8 +170,10 @@ void Conv2D::forward_loop_device(const Tensor &input, Tensor &output, int batch_
 
 Tensor Conv2D::backward(const Tensor &grad_output, const std::string &device)
 {
-	Tensor grad_input(last_input.batch, in_channels,
-					  last_input.height, last_input.width);
+	// Tensor grad_input(last_input.batch, in_channels,
+	// 				  last_input.height, last_input.width);
+	this->cached_grad_input.reshape_if_needed(
+		last_input.batch, in_channels, last_input.height, last_input.width);
 
 	int batch_size = grad_output.batch;
 
@@ -178,21 +185,21 @@ Tensor Conv2D::backward(const Tensor &grad_output, const std::string &device)
 
 	if (device == "host")
 	{
-		grad_input.zeros();
-		backward_loop_host(grad_output, grad_input, batch_size, input_h, input_w, output_h, output_w);
+		this->cached_grad_input.zeros();
+		backward_loop_host(grad_output, this->cached_grad_input, batch_size, input_h, input_w, output_h, output_w);
 	}
 	else if (device == "device")
 	{
-		grad_input.allocate_device();
-		grad_input.zeros("device");
-		backward_loop_device(grad_output, grad_input, batch_size, input_h, input_w, output_h, output_w);
+		// this->cached_grad_input.allocate_device();
+		this->cached_grad_input.zeros("device");
+		backward_loop_device(grad_output, this->cached_grad_input, batch_size, input_h, input_w, output_h, output_w);
 	}
 	else
 	{
 		throw std::invalid_argument("Invalid device specified for Conv2D backward");
 	}
 
-	return grad_input;
+	return this->cached_grad_input;
 }
 
 void Conv2D::backward_loop_host(const Tensor &grad_output, Tensor &grad_input, int batch_size, int input_h, int input_w, int output_h, int output_w)

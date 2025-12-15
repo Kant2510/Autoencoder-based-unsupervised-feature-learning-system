@@ -15,29 +15,31 @@ Tensor MaxPool2D::forward(const Tensor &input, const std::string &device)
 	int output_h = (input_h - pool_size) / stride + 1;
 	int output_w = (input_w - pool_size) / stride + 1;
 
-	Tensor output(batch_size, channels, output_h, output_w);
+	// Tensor output(batch_size, channels, output_h, output_w);
+	this->cached_output.reshape_if_needed(batch_size, channels, output_h, output_w);
 
-	this->mask = Tensor(batch_size, channels, input_h, input_w);
+	// this->mask = Tensor(batch_size, channels, input_h, input_w);
+	this->mask.reshape_if_needed(batch_size, channels, input_h, input_w);
 
 	if (device == "host")
 	{
 		this->mask.zeros("host");
-		forward_loop_host(input, output, channels, batch_size, input_h, input_w, output_h, output_w);
+		forward_loop_host(input, this->cached_output, channels, batch_size, input_h, input_w, output_h, output_w);
 	}
 	else if (device == "device")
 	{
-		output.allocate_device();
-		this->mask.allocate_device();
+		// this->cached_output.allocate_device();
+		// this->mask.allocate_device();
 		// Initialize mask to zero directly on GPU
 		this->mask.zeros("device");
-		forward_loop_device(input, output, channels, batch_size, input_h, input_w, output_h, output_w);
+		forward_loop_device(input, this->cached_output, channels, batch_size, input_h, input_w, output_h, output_w);
 	}
 	else
 	{
 		throw std::invalid_argument("Device must be 'host' or 'device'");
 	}
 
-	return output;
+	return this->cached_output;
 }
 
 void MaxPool2D::forward_loop_host(const Tensor &input, Tensor &output, int channels, int batch_size, int input_h, int input_w, int output_h, int output_w)
@@ -114,8 +116,11 @@ void MaxPool2D::forward_loop_device(const Tensor &input, Tensor &output, int cha
 
 Tensor MaxPool2D::backward(const Tensor &grad_output, const std::string &device)
 {
-	Tensor grad_input(last_input.batch, last_input.channels,
-					  last_input.height, last_input.width);
+	// Tensor grad_input(last_input.batch, last_input.channels,
+	// 				  last_input.height, last_input.width);
+	this->cached_grad_input.reshape_if_needed(
+		last_input.batch, last_input.channels,
+		last_input.height, last_input.width);
 
 	int out_h = grad_output.height;
 	int out_w = grad_output.width;
@@ -123,15 +128,15 @@ Tensor MaxPool2D::backward(const Tensor &grad_output, const std::string &device)
 	if (device == "host")
 	{
 		// Initialize on CPU for host computation
-		grad_input.zeros();
-		backward_loop_host(grad_output, grad_input, out_h, out_w);
+		this->cached_grad_input.zeros();
+		backward_loop_host(grad_output, this->cached_grad_input, out_h, out_w);
 	}
 	else if (device == "device")
 	{
-		grad_input.allocate_device();
+		// grad_input.allocate_device();
 		// Initialize to zero directly on GPU
-		grad_input.zeros("device");
-		backward_loop_device(grad_output, grad_input,
+		this->cached_grad_input.zeros("device");
+		backward_loop_device(grad_output, this->cached_grad_input,
 							 last_input.channels, last_input.batch,
 							 last_input.height, last_input.width,
 							 out_h, out_w);
@@ -141,7 +146,7 @@ Tensor MaxPool2D::backward(const Tensor &grad_output, const std::string &device)
 		throw std::invalid_argument("Device must be 'host' or 'device'");
 	}
 
-	return grad_input;
+	return this->cached_grad_input;
 }
 
 void MaxPool2D::backward_loop_host(const Tensor &grad_output, Tensor &grad_input, int output_h, int output_w)

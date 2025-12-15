@@ -6,6 +6,8 @@ class Upsample2D
 {
 private:
     int scale_factor;
+    Tensor cached_output;     // Lưu output của lần forward cuối cùng (dùng cho backward)
+    Tensor cached_grad_input; // Lưu grad_input của lần backward cuối cùng (dùng
 
 public:
     Upsample2D(int scale = 2) : scale_factor(scale) {};

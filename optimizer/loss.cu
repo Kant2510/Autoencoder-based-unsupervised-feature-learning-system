@@ -50,33 +50,34 @@ float MSELoss::forward(const Tensor &output, const Tensor &target, std::string d
 
 Tensor MSELoss::backward(const Tensor &output, const Tensor &target, std::string device)
 {
-    Tensor grad(output.batch, output.channels, output.height, output.width);
+    // Tensor grad(output.batch, output.channels, output.height, output.width);
+    this->cached_grad.reshape_if_needed(output.batch, output.channels, output.height, output.width);
     int n = output.numel();
 
     if (device == "device")
     {
         // GPU implementation
-        grad.allocate_device();
+        // grad.allocate_device();
 
         const int blockSize = 256;
         const int numBlocks = (n + blockSize - 1) / blockSize;
 
         mse_loss_backward_kernel<<<numBlocks, blockSize>>>(
-            output.d_data, target.d_data, grad.d_data, n);
+            output.d_data, target.d_data, this->cached_grad.d_data, n);
 
         CHECK_CUDA(cudaDeviceSynchronize());
         CHECK_CUDA(cudaGetLastError());
 
         // grad.to_host();
-        return grad;
+        return this->cached_grad;
     }
 
     // CPU implementation
     float scale = 2.0f / output.h_data.size();
     for (size_t i = 0; i < output.h_data.size(); i++)
     {
-        grad.h_data[i] = scale * (output.h_data[i] - target.h_data[i]);
+        this->cached_grad.h_data[i] = scale * (output.h_data[i] - target.h_data[i]);
     }
 
-    return grad;
+    return this->cached_grad;
 }

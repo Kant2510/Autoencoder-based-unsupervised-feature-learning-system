@@ -7,7 +7,9 @@ class MaxPool2D
 {
 public:
 	int pool_size, stride;
-	Tensor last_input, mask; // Dùng cho Backward Pass sau này
+	Tensor last_input, mask;  // Dùng cho Backward Pass sau này
+	Tensor cached_output;	  // Lưu output của lần forward cuối cùng (dùng cho backward)
+	Tensor cached_grad_input; // Lưu grad_input của lần backward cuối cùng (dùng cho backward)
 
 	MaxPool2D(int p_size = 2, int s = 2) : pool_size(p_size), stride(s) {}
 	Tensor forward(const Tensor &input, const std::string &device = "host");

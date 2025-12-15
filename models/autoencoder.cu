@@ -3,11 +3,11 @@
 #include "autoencoder.h"
 
 // Hàm này nhận vào Gradient từ lớp sau và Output của lớp Conv hiện tại
-Tensor compute_relu_gradient(const Tensor &grad_output, const Tensor &fused_conv_output)
+void compute_relu_gradient(const Tensor &grad_output, const Tensor &fused_conv_output)
 {
     // 1. Tạo Tensor kết quả (grad_input cho Conv)
-    Tensor grad_input(grad_output.batch, grad_output.channels, grad_output.height, grad_output.width);
-    grad_input.allocate_device();
+    // Tensor grad_input(grad_output.batch, grad_output.channels, grad_output.height, grad_output.width);
+    // grad_input.allocate_device();
 
     // 2. Gọi Kernel
     int total = grad_output.numel();
@@ -17,13 +17,14 @@ Tensor compute_relu_gradient(const Tensor &grad_output, const Tensor &fused_conv
     relu_backward_kernel_2<<<blocks, threads>>>(
         grad_output.d_data,       // dL/dy
         fused_conv_output.d_data, // y (Dùng làm mask)
-        grad_input.d_data,        // dL/dx (Kết quả trả về)
+        // grad_input.d_data,        // dL/dx (Kết quả trả về)
+        grad_output.d_data, // dL/dx (Kết quả trả về)
         total);
 
     CHECK_CUDA(cudaDeviceSynchronize());
     CHECK_CUDA(cudaGetLastError());
 
-    return grad_input;
+    // return grad_output;
 }
 
 Autoencoder::Autoencoder()
@@ -90,23 +91,23 @@ Tensor Autoencoder::backward(const Tensor &grad_output, float learning_rate, con
     // grad = relu4.backward(grad, device);
     // Bước A: Tính gradient xuyên qua ReLU bằng cách dùng output của Conv4
     // out_conv4 ở đây đóng vai trò làm mask
-    grad = compute_relu_gradient(grad, out_conv4);
+    compute_relu_gradient(grad, out_conv4);
     // Bước B: Truyền gradient đã lọc qua ReLU vào Conv4 Backward
     grad = conv4.backward(grad, device);
 
     grad = upsample1.backward(grad, device);
     // grad = relu3.backward(grad, device);
-    grad = compute_relu_gradient(grad, out_conv3);
+    compute_relu_gradient(grad, out_conv3);
     grad = conv3.backward(grad, device);
 
     grad = pool2.backward(grad, device);
     // grad = relu2.backward(grad, device);
-    grad = compute_relu_gradient(grad, out_conv2);
+    compute_relu_gradient(grad, out_conv2);
     grad = conv2.backward(grad, device);
 
     grad = pool1.backward(grad, device);
     // grad = relu1.backward(grad, device);
-    grad = compute_relu_gradient(grad, out_conv1);
+    compute_relu_gradient(grad, out_conv1);
     grad = conv1.backward(grad, device);
 
     conv1.updateWeights(learning_rate, device);

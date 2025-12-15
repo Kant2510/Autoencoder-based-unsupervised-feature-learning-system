@@ -5,6 +5,7 @@
 class MSELoss
 {
 public:
+    Tensor cached_grad;
     float forward(const Tensor &output, const Tensor &target, std::string device = "host");
     Tensor backward(const Tensor &output, const Tensor &target, std::string device = "host");
 };

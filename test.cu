@@ -197,6 +197,11 @@ void train(int BATCH_SIZE, int EPOCHS, float LEARNING_RATE, int LIMIT, const std
 		num_batches = dataset.getNumTrainBatches(BATCH_SIZE);
 	}
 
+	// 1. Cấp phát vùng đệm Input TRƯỚC vòng lặp
+	Tensor gpu_batch_buffer;
+	// Cấp sẵn dung lượng cho max batch size (ví dụ 64)
+	gpu_batch_buffer.ensure_device_memory(BATCH_SIZE * 3 * 32 * 32);
+
 	std::cout << "\n========== Training Started with " << num_data << " samples ==========" << std::endl;
 	std::cout << "Batch size: " << BATCH_SIZE << std::endl;
 	std::cout << "Num batches: " << num_batches << std::endl;
@@ -226,14 +231,27 @@ void train(int BATCH_SIZE, int EPOCHS, float LEARNING_RATE, int LIMIT, const std
 			auto b0 = std::chrono::high_resolution_clock::now();
 
 			Tensor batch = dataset.getBatch(start_index, BATCH_SIZE, true);
-			batch.allocate_device();
-			batch.to_device();
-			Tensor output = model.forward(batch, "device");
 
-			float batch_loss = loss_fn.forward(output, batch, "device");
+			// Update shape cho buffer GPU (phòng trường hợp batch cuối lẻ)
+			gpu_batch_buffer.batch = batch.batch;
+			gpu_batch_buffer.channels = batch.channels;
+			gpu_batch_buffer.height = batch.height;
+			gpu_batch_buffer.width = batch.width;
+
+			// Copy H2D vào buffer cố định (KHÔNG allocate mới)
+			CHECK_CUDA(cudaMemcpy(
+				gpu_batch_buffer.d_data,
+				batch.h_data.data(), // Hoặc batch.h_pinned
+				gpu_batch_buffer.numel() * sizeof(float),
+				cudaMemcpyHostToDevice));
+			// batch.allocate_device();
+			// batch.to_device();
+			Tensor output = model.forward(gpu_batch_buffer, "device");
+
+			float batch_loss = loss_fn.forward(output, gpu_batch_buffer, "device");
 			total_loss += batch_loss;
 
-			Tensor grad = loss_fn.backward(output, batch, "device");
+			Tensor grad = loss_fn.backward(output, gpu_batch_buffer, "device");
 			model.backward(grad, LEARNING_RATE, "device");
 
 			auto b1 = std::chrono::high_resolution_clock::now();
@@ -279,6 +297,7 @@ void train(int BATCH_SIZE, int EPOCHS, float LEARNING_RATE, int LIMIT, const std
 			BATCH_SIZE,
 			num_batches);
 	}
+	gpu_batch_buffer.free_device();
 
 	// lưu trọng số vào trainX/weights.bin
 	model.saveWeights(weightOutPath);
@@ -349,7 +368,7 @@ int main(int argc, char *argv[])
 
 	// // Test Autoencoder forward
 	// Tensor output = test_forward(input);
-	int batch_size = 32;
+	int batch_size = 64;
 	int epochs = 7;
 	float lr = 0.004f;
 	// 2% of data

@@ -14,6 +14,9 @@ public:
 	// Trọng số và Bias
 	Tensor weights, bias, grad_weights, grad_bias;
 	Tensor last_input;
+	// BỘ NHỚ ĐỆM (CACHE) - Đây là Memory Pool của riêng layer này
+	Tensor cached_output;	  // Dùng cho forward
+	Tensor cached_grad_input; // Dùng cho backward
 
 	Conv2D(int in_c, int out_c, int k_size = 3, int s = 1, int p = 1);
 

@@ -86,6 +86,41 @@ public:
         }
     }
 
+    size_t capacity = 0; // Dung lượng thực tế (số phần tử float) đang có trên GPU
+
+    // Hàm cấp phát thông minh (Chỉ malloc nếu chưa đủ chỗ)
+    void ensure_device_memory(int needed_elements)
+    {
+        if (needed_elements > capacity)
+        {
+            // Nếu chưa có hoặc không đủ chỗ -> Cấp phát mới (Lớn hơn hoặc bằng)
+            if (d_data != nullptr)
+            {
+                cudaFree(d_data);
+            }
+
+            // Cấp phát dư ra một chút hoặc đúng bằng needed
+            // Ở đây ta cấp đúng bằng needed để đơn giản
+            CHECK_CUDA(cudaMalloc(&d_data, needed_elements * sizeof(float)));
+            capacity = needed_elements;
+
+            // Debug log (để thấy nó chỉ chạy 1 lần)
+            std::cout << "Allocated GPU memory: " << capacity * 4 / 1024 << " KB" << std::endl;
+        }
+        // Nếu capacity >= needed_elements -> KHÔNG LÀM GÌ CẢ (Tái sử dụng)
+    }
+
+    // Hàm resize logic (cập nhật shape nhưng giữ nguyên vùng nhớ nếu đủ)
+    void reshape_if_needed(int b, int c, int h, int w)
+    {
+        batch = b;
+        channels = c;
+        height = h;
+        width = w;
+        int needed = b * c * h * w;
+        ensure_device_memory(needed);
+    }
+
     // Giải phóng bộ nhớ GPU
     void free_device()
     {
@@ -93,6 +128,7 @@ public:
         {
             cudaFree(d_data);
             d_data = nullptr;
+            capacity = 0;
         }
     }
 

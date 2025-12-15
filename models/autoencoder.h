@@ -19,6 +19,60 @@ private:
 
 public:
     Autoencoder();
+    ~Autoencoder()
+    {
+        out_conv1.free_device();
+        out_conv2.free_device();
+        out_conv3.free_device();
+        out_conv4.free_device();
+        out_conv5.free_device();
+        // free GPU memory
+        conv1.weights.free_device();
+        conv1.bias.free_device();
+        conv1.grad_weights.free_device();
+        conv1.grad_bias.free_device();
+        conv1.cached_output.free_device();
+        conv1.cached_grad_input.free_device();
+        conv1.last_input.free_device();
+
+        conv2.weights.free_device();
+        conv2.bias.free_device();
+        conv2.grad_weights.free_device();
+        conv2.grad_bias.free_device();
+        conv2.cached_output.free_device();
+        conv2.cached_grad_input.free_device();
+        conv2.last_input.free_device();
+
+        conv3.weights.free_device();
+        conv3.bias.free_device();
+        conv3.grad_weights.free_device();
+        conv3.grad_bias.free_device();
+        conv3.cached_output.free_device();
+        conv3.cached_grad_input.free_device();
+        conv3.last_input.free_device();
+
+        conv4.weights.free_device();
+        conv4.bias.free_device();
+        conv4.grad_weights.free_device();
+        conv4.grad_bias.free_device();
+        conv4.cached_output.free_device();
+        conv4.cached_grad_input.free_device();
+        conv4.last_input.free_device();
+
+        conv5.weights.free_device();
+        conv5.bias.free_device();
+        conv5.grad_weights.free_device();
+        conv5.grad_bias.free_device();
+        conv5.cached_output.free_device();
+        conv5.cached_grad_input.free_device();
+        conv5.last_input.free_device();
+
+        pool1.last_input.free_device();
+        pool1.mask.free_device();
+
+        pool2.last_input.free_device();
+        pool2.mask.free_device();
+    }
     Tensor forward(const Tensor &input, const std::string &device = "host");
     Tensor backward(const Tensor &grad_output, float learning_rate, const std::string &device = "host");
     void saveWeights(const std::string &path);

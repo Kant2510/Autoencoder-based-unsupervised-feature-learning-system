@@ -51,8 +51,8 @@ void Tensor::zeros(const std::string &device)
 	}
 	else if (device == "device")
 	{
-		if (d_data == nullptr)
-			allocate_device();
+		// if (d_data == nullptr)
+		// 	allocate_device();
 		CHECK_CUDA(cudaMemset(d_data, 0, numel() * sizeof(float)));
 	}
 }
