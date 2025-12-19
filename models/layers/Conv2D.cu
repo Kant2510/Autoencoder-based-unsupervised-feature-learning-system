@@ -15,35 +15,44 @@ Conv2D::Conv2D(int in_c, int out_c, int k_size, int s, int p)
 	std::default_random_engine generator;
 	std::normal_distribution<float> distribution(0.0, std_dev);
 
-	weights = Tensor(out_channels, in_channels, kernel_size, kernel_size);
-	bias = Tensor(1, out_channels, 1, 1);
+	// weights = Tensor(out_channels, in_channels, kernel_size, kernel_size);
+	// bias = Tensor(1, out_channels, 1, 1);
 	// grad_weights = Tensor(out_channels, in_channels, kernel_size, kernel_size);
 	// grad_bias = Tensor(1, out_channels, 1, 1);
+	weights.reshape_if_needed(out_channels, in_channels, kernel_size, kernel_size);
+	bias.reshape_if_needed(1, out_channels, 1, 1);
 	grad_weights.reshape_if_needed(out_channels, in_channels, kernel_size, kernel_size);
 	grad_bias.reshape_if_needed(1, out_channels, 1, 1);
 
-	for (auto &w : weights.h_data)
-		w = distribution(generator);
+	weights.allocate_pinned();
+	bias.allocate_pinned();
+
+	// for (auto &w : weights.h_pinned)
+	// 	w = distribution(generator);
+	for (int i = 0; i < weights.numel(); i++)
+	{
+		weights.h_pinned[i] = distribution(generator);
+	}
 	bias.zeros();
 	// grad_weights.zeros();
 	// grad_bias.zeros();
 
-	weights.allocate_device();
-	bias.allocate_device();
+	// weights.allocate_device();
+	// bias.allocate_device();
 	// grad_weights.allocate_device();
 	// grad_bias.allocate_device();
 
 	// Copy initialized weights and bias to device
 	weights.to_device();
-	bias.to_device();
+	bias.zeros("device");
 	// Initialize gradients to zero directly on GPU (no need to copy CPU zeros)
 	grad_weights.zeros("device");
 	grad_bias.zeros("device");
 }
 
-Tensor Conv2D::forward(const Tensor &input, const std::string &device, const bool use_relu)
+void Conv2D::forward(const Tensor &input, const std::string &device, const bool use_relu)
 {
-	this->last_input = input;
+	this->last_input = &input;
 
 	int batch_size = input.batch;
 
@@ -74,7 +83,7 @@ Tensor Conv2D::forward(const Tensor &input, const std::string &device, const boo
 		throw std::invalid_argument("Invalid device specified for Conv2D forward");
 	}
 
-	return this->cached_output;
+	// return this->cached_output;
 }
 
 void Conv2D::forward_loop_host(const Tensor &input, Tensor &output, int batch_size, int input_h, int input_w, int output_h, int output_w, const bool use_relu)
@@ -168,17 +177,17 @@ void Conv2D::forward_loop_device(const Tensor &input, Tensor &output, int batch_
 	// output.to_host();
 }
 
-Tensor Conv2D::backward(const Tensor &grad_output, const std::string &device)
+void Conv2D::backward(const Tensor &grad_output, const std::string &device)
 {
 	// Tensor grad_input(last_input.batch, in_channels,
 	// 				  last_input.height, last_input.width);
 	this->cached_grad_input.reshape_if_needed(
-		last_input.batch, in_channels, last_input.height, last_input.width);
+		last_input->batch, in_channels, last_input->height, last_input->width);
 
 	int batch_size = grad_output.batch;
 
-	int input_h = last_input.height;
-	int input_w = last_input.width;
+	int input_h = last_input->height;
+	int input_w = last_input->width;
 
 	int output_h = grad_output.height;
 	int output_w = grad_output.width;
@@ -199,7 +208,7 @@ Tensor Conv2D::backward(const Tensor &grad_output, const std::string &device)
 		throw std::invalid_argument("Invalid device specified for Conv2D backward");
 	}
 
-	return this->cached_grad_input;
+	// return this->cached_grad_input;
 }
 
 void Conv2D::backward_loop_host(const Tensor &grad_output, Tensor &grad_input, int batch_size, int input_h, int input_w, int output_h, int output_w)
@@ -224,11 +233,11 @@ void Conv2D::backward_loop_host(const Tensor &grad_output, Tensor &grad_input, i
 								int ih = oh * stride - padding + kh;
 								int iw = ow * stride - padding + kw;
 
-								if (ih >= 0 && ih < last_input.height &&
-									iw >= 0 && iw < last_input.width)
+								if (ih >= 0 && ih < last_input->height &&
+									iw >= 0 && iw < last_input->width)
 								{
 									grad_weights.at(oc, ic, kh, kw) +=
-										grad * last_input.at(b, ic, ih, iw);
+										grad * last_input->at(b, ic, ih, iw);
 									grad_input.at(b, ic, ih, iw) +=
 										grad * weights.at(oc, ic, kh, kw);
 								}
@@ -273,7 +282,7 @@ void Conv2D::backward_loop_device(const Tensor &grad_output, Tensor &grad_input,
 	int blocksW = (total_weights + threadsW - 1) / threadsW;
 
 	conv2d_backward_weight_kernel_opt<<<blocksW, threadsW>>>(
-		last_input.d_data,
+		last_input->d_data,
 		grad_output.d_data,
 		grad_weights.d_data,
 		batch_size, in_channels, out_channels,

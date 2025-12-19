@@ -1,8 +1,8 @@
 #include "Relu.h"
 
-Tensor ReLU::forward(const Tensor &input, const std::string &device)
+void ReLU::forward(const Tensor &input, const std::string &device)
 {
-	this->last_input = input;
+	this->last_input = &input;
 
 	// Tensor output(input.batch, input.channels, input.height, input.width);
 	this->cached_output.reshape_if_needed(input.batch, input.channels, input.height, input.width);
@@ -36,10 +36,10 @@ Tensor ReLU::forward(const Tensor &input, const std::string &device)
 		throw std::invalid_argument("Unknown device: " + device);
 	}
 
-	return this->cached_output;
+	// return this->cached_output;
 }
 
-Tensor ReLU::backward(const Tensor &grad_output, const std::string &device)
+void ReLU::backward(const Tensor &grad_output, const std::string &device)
 {
 	// Tensor grad_input(grad_output.batch, grad_output.channels, grad_output.height, grad_output.width);
 	this->cached_grad_input.reshape_if_needed(grad_output.batch, grad_output.channels, grad_output.height, grad_output.width);
@@ -48,7 +48,7 @@ Tensor ReLU::backward(const Tensor &grad_output, const std::string &device)
 	{
 		for (size_t i = 0; i < this->cached_grad_input.h_data.size(); i++)
 		{
-			this->cached_grad_input.h_data[i] = (last_input.h_data[i] > 0.0f) ? grad_output.h_data[i] : 0.0f;
+			this->cached_grad_input.h_data[i] = (last_input->h_data[i] > 0.0f) ? grad_output.h_data[i] : 0.0f;
 		}
 	}
 	else if (device == "device")
@@ -60,7 +60,7 @@ Tensor ReLU::backward(const Tensor &grad_output, const std::string &device)
 		int blocks = (total + threads - 1) / threads;
 
 		relu_backward_kernel<<<blocks, threads>>>(
-			last_input.d_data,
+			last_input->d_data,
 			grad_output.d_data,
 			this->cached_grad_input.d_data,
 			total);
@@ -74,5 +74,5 @@ Tensor ReLU::backward(const Tensor &grad_output, const std::string &device)
 		throw std::invalid_argument("Unknown device: " + device);
 	}
 
-	return this->cached_grad_input;
+	// return this->cached_grad_input;
 }

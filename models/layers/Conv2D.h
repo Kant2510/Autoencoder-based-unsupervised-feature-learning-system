@@ -13,7 +13,7 @@ public:
 
 	// Trọng số và Bias
 	Tensor weights, bias, grad_weights, grad_bias;
-	Tensor last_input;
+	const Tensor *last_input;
 	// BỘ NHỚ ĐỆM (CACHE) - Đây là Memory Pool của riêng layer này
 	Tensor cached_output;	  // Dùng cho forward
 	Tensor cached_grad_input; // Dùng cho backward
@@ -22,9 +22,9 @@ public:
 
 	// Hàm Forward
 	// input: mảng phẳng chứa batch_size ảnh
-	Tensor forward(const Tensor &input, const std::string &device = "host", const bool use_relu = true);
+	void forward(const Tensor &input, const std::string &device = "host", const bool use_relu = true);
 	// Hàm Backward (tính gradient)
-	Tensor backward(const Tensor &grad_output, const std::string &device = "host");
+	void backward(const Tensor &grad_output, const std::string &device = "host");
 	// Cập nhật trọng số
 	void updateWeights(float learning_rate, const std::string &device = "host");
 	// Forward loop on host

@@ -40,7 +40,11 @@ float Tensor::at(int n, int c, int h, int w) const
 
 void Tensor::fill(float value)
 {
-	std::fill(h_data.begin(), h_data.end(), value);
+	// std::fill(h_data.begin(), h_data.end(), value);
+	if (h_pinned != nullptr)
+	{
+		std::fill(h_pinned, h_pinned + numel(), value);
+	}
 }
 
 void Tensor::zeros(const std::string &device)
@@ -70,79 +74,4 @@ void Tensor::print_shape() const
 	std::cout << "Shape: (";
 	std::cout << batch << ", " << channels << ", " << height << ", " << width;
 	std::cout << ")" << std::endl;
-}
-
-Tensor::Tensor(const Tensor &other)
-	: batch(other.batch),
-	  channels(other.channels),
-	  height(other.height),
-	  width(other.width),
-	  h_data(other.h_data),
-	  d_data(nullptr)
-{
-	if (other.d_data)
-	{
-		allocate_device();
-		CHECK_CUDA(cudaMemcpy(
-			d_data,
-			other.d_data,
-			numel() * sizeof(float),
-			cudaMemcpyDeviceToDevice));
-	}
-}
-Tensor &Tensor::operator=(const Tensor &other)
-{
-	if (this == &other)
-		return *this;
-
-	free_device();
-
-	batch = other.batch;
-	channels = other.channels;
-	height = other.height;
-	width = other.width;
-	h_data = other.h_data;
-
-	if (other.d_data)
-	{
-		allocate_device();
-		CHECK_CUDA(cudaMemcpy(
-			d_data,
-			other.d_data,
-			numel() * sizeof(float),
-			cudaMemcpyDeviceToDevice));
-	}
-
-	return *this;
-}
-Tensor::Tensor(Tensor &&other) noexcept
-	: h_data(std::move(other.h_data)),
-	  d_data(other.d_data),
-	  batch(other.batch),
-	  channels(other.channels),
-	  height(other.height),
-	  width(other.width)
-{
-	other.d_data = nullptr;
-	other.batch = other.channels = other.height = other.width = 0;
-}
-Tensor &Tensor::operator=(Tensor &&other) noexcept
-{
-	if (this == &other)
-		return *this;
-
-	free_device();
-
-	h_data = std::move(other.h_data);
-	d_data = other.d_data;
-
-	batch = other.batch;
-	channels = other.channels;
-	height = other.height;
-	width = other.width;
-
-	other.d_data = nullptr;
-	other.batch = other.channels = other.height = other.width = 0;
-
-	return *this;
 }

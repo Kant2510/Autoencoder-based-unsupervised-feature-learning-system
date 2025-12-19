@@ -27,6 +27,7 @@ class Tensor
 {
 public:
     std::vector<float> h_data; // Host data (CPU)
+    float *h_pinned = nullptr; // Host pinned memory (CPU pinned)
     float *d_data = nullptr;   // Device data (GPU)
 
     int batch, channels, height, width;
@@ -35,11 +36,17 @@ public:
 
     Tensor(int b, int c, int h, int w);
 
-    Tensor(const Tensor &other);            // deep copy
-    Tensor &operator=(const Tensor &other); // deep copy
+    // Tensor(const Tensor &other);            // deep copy
+    // Tensor &operator=(const Tensor &other); // deep copy
 
-    Tensor(Tensor &&other) noexcept; // move
-    Tensor &operator=(Tensor &&other) noexcept;
+    // Tensor(Tensor &&other) noexcept; // move
+    // Tensor &operator=(Tensor &&other) noexcept;
+
+    Tensor(const Tensor &) = delete;
+    Tensor &operator=(const Tensor &) = delete;
+
+    Tensor(Tensor &&) noexcept = default;
+    Tensor &operator=(Tensor &&) noexcept = default;
 
     // Lấy tổng số phần tử
     int numel() const;
@@ -73,8 +80,18 @@ public:
     void to_device()
     {
         if (d_data == nullptr)
-            allocate_device();
-        CHECK_CUDA(cudaMemcpy(d_data, h_data.data(), numel() * sizeof(float), cudaMemcpyHostToDevice));
+        {
+            // allocate_device();
+            std::cout << "Device memory not allocated. Call ensure_device_memory() first." << std::endl;
+            throw std::runtime_error("Device memory not allocated. Call ensure_device_memory() first.");
+        }
+        // CHECK_CUDA(cudaMemcpy(d_data, h_data.data(), numel() * sizeof(float), cudaMemcpyHostToDevice));
+        // Sử dụng pinned memory nếu có
+        if (h_pinned != nullptr)
+        {
+            // std::cout << "Using pinned memory for to_device()" << std::endl;
+            CHECK_CUDA(cudaMemcpy(d_data, h_pinned, numel() * sizeof(float), cudaMemcpyHostToDevice));
+        }
     }
 
     // Copy GPU -> CPU (Dùng để debug hoặc lấy kết quả cuối)
@@ -82,11 +99,31 @@ public:
     {
         if (d_data != nullptr)
         {
-            CHECK_CUDA(cudaMemcpy(h_data.data(), d_data, numel() * sizeof(float), cudaMemcpyDeviceToHost));
+            // CHECK_CUDA(cudaMemcpy(h_data.data(), d_data, numel() * sizeof(float), cudaMemcpyDeviceToHost));
+            // Sử dụng pinned memory nếu có
+            if (h_pinned != nullptr)
+            {
+                // std::cout << "Using pinned memory for to_host()" << std::endl;
+                CHECK_CUDA(cudaMemcpy(h_pinned, d_data, numel() * sizeof(float), cudaMemcpyDeviceToHost));
+            }
         }
     }
 
-    size_t capacity = 0; // Dung lượng thực tế (số phần tử float) đang có trên GPU
+    size_t capacity = 0;        // Dung lượng thực tế (số phần tử float) đang có trên GPU
+    size_t capacity_pinned = 0; // Dung lượng thực tế (số phần tử float) đang có trên CPU pinned
+
+    void allocate_pinned()
+    {
+        size_t needed = numel();
+        if (needed > capacity_pinned)
+        {
+            if (h_pinned)
+                cudaFreeHost(h_pinned);
+            // cudaHostAllocDefault cho phép portable pinned memory
+            CHECK_CUDA(cudaHostAlloc((void **)&h_pinned, needed * sizeof(float), cudaHostAllocDefault));
+            capacity_pinned = needed;
+        }
+    }
 
     // Hàm cấp phát thông minh (Chỉ malloc nếu chưa đủ chỗ)
     void ensure_device_memory(int needed_elements)
@@ -129,6 +166,12 @@ public:
             cudaFree(d_data);
             d_data = nullptr;
             capacity = 0;
+        }
+        if (h_pinned != nullptr)
+        {
+            cudaFreeHost(h_pinned);
+            h_pinned = nullptr;
+            capacity_pinned = 0;
         }
     }
 

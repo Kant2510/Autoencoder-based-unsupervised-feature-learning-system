@@ -1,6 +1,6 @@
 #include "Upsample2D.h"
 
-Tensor Upsample2D::forward(const Tensor &input, const std::string &device)
+void Upsample2D::forward(const Tensor &input, const std::string &device)
 {
 	int channels = input.channels;
 	int batch_size = input.batch;
@@ -27,7 +27,7 @@ Tensor Upsample2D::forward(const Tensor &input, const std::string &device)
 		throw std::invalid_argument("Invalid device specified. Use 'host' or 'device'.");
 	}
 
-	return this->cached_output;
+	// return this->cached_output;
 }
 
 void Upsample2D::forward_loop_host(const Tensor &input, Tensor &output,
@@ -75,7 +75,7 @@ void Upsample2D::forward_loop_device(const Tensor &input, Tensor &output,
 	// output.to_host(); // Copy result back to host if needed
 }
 
-Tensor Upsample2D::backward(const Tensor &grad_output, const std::string &device)
+void Upsample2D::backward(const Tensor &grad_output, const std::string &device)
 {
 	int in_h = grad_output.height / scale_factor;
 	int in_w = grad_output.width / scale_factor;
@@ -106,7 +106,7 @@ Tensor Upsample2D::backward(const Tensor &grad_output, const std::string &device
 		throw std::invalid_argument("Invalid device specified. Use 'host' or 'device'.");
 	}
 
-	return this->cached_grad_input;
+	// return this->cached_grad_input;
 }
 
 void Upsample2D::backward_loop_host(const Tensor &grad_output, Tensor &grad_input,

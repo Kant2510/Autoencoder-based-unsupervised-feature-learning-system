@@ -8,8 +8,9 @@
 class CIFAR10Dataset
 {
 private:
-  std::vector<float> train_images;
-  std::vector<float> test_images;
+  // Dùng Pinned Memory để chứa toàn bộ dataset
+  float *train_images_pinned = nullptr;
+  float *test_images_pinned = nullptr;
   std::vector<int> train_labels;
   std::vector<int> test_labels;
 
@@ -20,14 +21,15 @@ private:
   std::vector<int> shuffle_indices;
   std::mt19937 rng;
 
-  bool loadBatch(const std::string &filename, std::vector<float> &images,
-                 std::vector<int> &labels);
+  bool loadBatchToBuffer(const std::string &filename, float *buffer_ptr, std::vector<int> &labels_vec, int offset_idx);
 
 public:
   CIFAR10Dataset();
+  ~CIFAR10Dataset(); // Cần destructor để free pinned memory
   bool loadData(const std::string &data_path);
   void shuffle();
-  Tensor getBatch(int start_idx, int batch_size, bool is_train = true);
+  // Trả về Tensor đã có h_pinned chứa data
+  void getBatch(Tensor &batch, int start_idx, int batch_size, bool is_train = true);
   int getNumTrainBatches(int batch_size) const;
   int getNumTestBatches(int batch_size) const;
   int getSizeTrain() const;

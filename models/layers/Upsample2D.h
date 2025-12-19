@@ -4,15 +4,15 @@
 
 class Upsample2D
 {
-private:
+public:
     int scale_factor;
     Tensor cached_output;     // Lưu output của lần forward cuối cùng (dùng cho backward)
     Tensor cached_grad_input; // Lưu grad_input của lần backward cuối cùng (dùng
 
 public:
     Upsample2D(int scale = 2) : scale_factor(scale) {};
-    Tensor forward(const Tensor &input, const std::string &device = "host");
-    Tensor backward(const Tensor &grad_output, const std::string &device = "host");
+    void forward(const Tensor &input, const std::string &device = "host");
+    void backward(const Tensor &grad_output, const std::string &device = "host");
     void forward_loop_host(const Tensor &input, Tensor &output,
                            int channels, int batch_size,
                            int out_h, int out_w);

@@ -48,7 +48,7 @@ float MSELoss::forward(const Tensor &output, const Tensor &target, std::string d
     return sum / output.h_data.size();
 }
 
-Tensor MSELoss::backward(const Tensor &output, const Tensor &target, std::string device)
+void MSELoss::backward(const Tensor &output, const Tensor &target, std::string device)
 {
     // Tensor grad(output.batch, output.channels, output.height, output.width);
     this->cached_grad.reshape_if_needed(output.batch, output.channels, output.height, output.width);
@@ -69,7 +69,8 @@ Tensor MSELoss::backward(const Tensor &output, const Tensor &target, std::string
         CHECK_CUDA(cudaGetLastError());
 
         // grad.to_host();
-        return this->cached_grad;
+        // return this->cached_grad;
+        return;
     }
 
     // CPU implementation
@@ -79,5 +80,5 @@ Tensor MSELoss::backward(const Tensor &output, const Tensor &target, std::string
         this->cached_grad.h_data[i] = scale * (output.h_data[i] - target.h_data[i]);
     }
 
-    return this->cached_grad;
+    // return this->cached_grad;
 }

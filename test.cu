@@ -10,149 +10,6 @@
 #include "utils/logs.h"
 #include "dataset/dataset.h"
 
-void print_vector(const std::vector<float> &vec, int size_limit = 10)
-{
-	std::cout << std::fixed << std::setprecision(4);
-	for (int i = 0; i < std::min((int)vec.size(), size_limit); ++i)
-	{
-		std::cout << vec[i] << " ";
-	}
-	if (vec.size() > size_limit)
-		std::cout << "...";
-	std::cout << std::endl;
-}
-
-void print_float_array(const float *arr, int size, int size_limit = 10)
-{
-	std::cout << std::fixed << std::setprecision(4);
-	for (int i = 0; i < std::min(size, size_limit); ++i)
-	{
-		std::cout << arr[i] << " ";
-	}
-	if (size > size_limit)
-		std::cout << "...";
-	std::cout << std::endl;
-}
-
-void compare(const Tensor &h_output, const Tensor &d_output)
-{
-	bool match = true;
-	float total_diff = 0.0f;
-	for (size_t i = 0; i < h_output.h_data.size(); ++i)
-	{
-		total_diff += std::abs(h_output.h_data[i] - d_output.h_data[i]);
-		if (std::abs(h_output.h_data[i] - d_output.h_data[i]) > 1e-3)
-		{
-			match = false;
-			std::cout << "Mismatch at index " << i << ": Host=" << h_output.h_data[i]
-					  << ", Device=" << d_output.h_data[i] << std::endl;
-			// break;
-		}
-	}
-	std::cout << "Total output size: " << h_output.h_data.size() << std::endl;
-	std::cout << "Total output size: " << d_output.h_data.size() << std::endl;
-	std::cout << "Total difference between Host and Device outputs: " << total_diff << std::endl;
-	std::cout << "Verifying Host vs Device output..." << std::endl;
-	if (match)
-		std::cout << "Host and Device outputs match!" << std::endl;
-	else
-		std::cout << "Host and Device outputs do NOT match!" << std::endl;
-}
-
-Tensor test_conv2d(const Tensor &input)
-{
-	std::cout << "\n=== Testing Conv2D Layer ===" << std::endl;
-
-	// Create Conv2D layer: 3 input channel, 6 output channels, 3x3 kernel, stride=1, padding=1
-	Conv2D conv(3, 6, 3, 1, 1);
-
-	// Perform forward pass
-	Tensor h_output = conv.forward(input, "host");
-	Tensor d_output = conv.forward(input, "device");
-
-	std::cout << "Output shape:" << std::endl;
-	h_output.print_shape();
-	d_output.print_shape();
-
-	std::cout << "Output (first 20 values):" << std::endl;
-	print_vector(h_output.h_data, 20);
-	// print_vector(d_output.h_data, 20);
-	print_float_array(d_output.h_data.data(), h_output.numel(), 20);
-
-	// Verify that host and device outputs match
-	compare(h_output, d_output);
-
-	return d_output;
-}
-
-Tensor test_maxpool(const Tensor &input)
-{
-	std::cout << "\n=== Testing MaxPool2D Layer ===" << std::endl;
-
-	// Create MaxPool2D layer with 2x2 pooling and stride 2
-	MaxPool2D maxpool;
-	Tensor h_output = maxpool.forward(input, "host");
-	Tensor d_output = maxpool.forward(input, "device");
-
-	std::cout << "Output shape:" << std::endl;
-	h_output.print_shape();
-	d_output.print_shape();
-
-	std::cout << "Output (first 20 values):" << std::endl;
-	print_vector(h_output.h_data, 20);
-	print_vector(d_output.h_data, 20);
-
-	// Verify that host and device outputs match
-	compare(h_output, d_output);
-
-	return d_output;
-}
-
-Tensor test_relu(const Tensor &input)
-{
-	std::cout << "\n=== Testing ReLU Layer ===" << std::endl;
-
-	ReLU relu;
-	Tensor h_output = relu.forward(input, "host");
-	Tensor d_output = relu.forward(input, "device");
-
-	std::cout << "Output shape:" << std::endl;
-	h_output.print_shape();
-	d_output.print_shape();
-
-	std::cout << "Output (first 20 values):" << std::endl;
-	print_vector(h_output.h_data, 20);
-	print_vector(d_output.h_data, 20);
-
-	// Verify that host and device outputs match
-	compare(h_output, d_output);
-
-	return d_output;
-}
-
-Tensor test_upsample(const Tensor &input)
-{
-	std::cout << "\n=== Testing Upsample Layer ===" << std::endl;
-
-	// Create Upsample layer with scale factor 2
-	Upsample2D upsample(2);
-	Tensor h_output = upsample.forward(input, "host");
-	Tensor d_output = upsample.forward(input, "device");
-
-	std::cout << "Output shape:" << std::endl;
-	h_output.print_shape();
-	d_output.print_shape();
-
-	std::cout << "Output (first 20 values):" << std::endl;
-	print_vector(h_output.h_data, 20);
-	print_vector(d_output.h_data, 20);
-
-	// Verify that host and device outputs match
-	compare(h_output, d_output);
-
-	return d_output;
-}
-
 void train(int BATCH_SIZE, int EPOCHS, float LEARNING_RATE, int LIMIT, const std::string &LOAD_PATH)
 {
 
@@ -199,6 +56,9 @@ void train(int BATCH_SIZE, int EPOCHS, float LEARNING_RATE, int LIMIT, const std
 
 	// 1. Cấp phát vùng đệm Input TRƯỚC vòng lặp
 	Tensor gpu_batch_buffer;
+	Tensor batch(BATCH_SIZE, 3, 32, 32);
+	batch.allocate_pinned();
+	// batch.ensure_device_memory(BATCH_SIZE * 3 * 32 * 32);
 	// Cấp sẵn dung lượng cho max batch size (ví dụ 64)
 	gpu_batch_buffer.ensure_device_memory(BATCH_SIZE * 3 * 32 * 32);
 
@@ -230,7 +90,7 @@ void train(int BATCH_SIZE, int EPOCHS, float LEARNING_RATE, int LIMIT, const std
 
 			auto b0 = std::chrono::high_resolution_clock::now();
 
-			Tensor batch = dataset.getBatch(start_index, BATCH_SIZE, true);
+			dataset.getBatch(batch, start_index, BATCH_SIZE, true);
 
 			// Update shape cho buffer GPU (phòng trường hợp batch cuối lẻ)
 			gpu_batch_buffer.batch = batch.batch;
@@ -241,19 +101,19 @@ void train(int BATCH_SIZE, int EPOCHS, float LEARNING_RATE, int LIMIT, const std
 			// Copy H2D vào buffer cố định (KHÔNG allocate mới)
 			CHECK_CUDA(cudaMemcpy(
 				gpu_batch_buffer.d_data,
-				batch.h_data.data(), // Hoặc batch.h_pinned
+				batch.h_pinned, // Hoặc batch.h_pinned
 				gpu_batch_buffer.numel() * sizeof(float),
 				cudaMemcpyHostToDevice));
 			// batch.allocate_device();
 			// batch.to_device();
-			Tensor output = model.forward(gpu_batch_buffer, "device");
+			// gpu_batch_buffer.to_device();
+			model.forward(gpu_batch_buffer, "device");
 
-			float batch_loss = loss_fn.forward(output, gpu_batch_buffer, "device");
+			float batch_loss = loss_fn.forward(model.conv5.cached_output, gpu_batch_buffer, "device");
 			total_loss += batch_loss;
 
-			Tensor grad = loss_fn.backward(output, gpu_batch_buffer, "device");
-			model.backward(grad, LEARNING_RATE, "device");
-
+			loss_fn.backward(model.conv5.cached_output, gpu_batch_buffer, "device");
+			model.backward(loss_fn.cached_grad, LEARNING_RATE, "device");
 			auto b1 = std::chrono::high_resolution_clock::now();
 			double step_time = std::chrono::duration<double, std::milli>(b1 - b0).count();
 			total_batch_time_ms += step_time;
@@ -268,9 +128,9 @@ void train(int BATCH_SIZE, int EPOCHS, float LEARNING_RATE, int LIMIT, const std
 			drawProgressBar(batch_idx + 1, num_batches, batch_loss, step_time);
 
 			// Giải phóng bộ nhớ tạm trong vòng lặp (Rất quan trọng để tránh đầy VRAM)
-			batch.free_device();
-			output.free_device();
-			grad.free_device();
+			// batch.free_device();
+			// output.free_device();
+			// grad.free_device();
 		}
 
 		auto epoch_end = std::chrono::high_resolution_clock::now();
@@ -297,52 +157,14 @@ void train(int BATCH_SIZE, int EPOCHS, float LEARNING_RATE, int LIMIT, const std
 			BATCH_SIZE,
 			num_batches);
 	}
-	gpu_batch_buffer.free_device();
 
 	// lưu trọng số vào trainX/weights.bin
 	model.saveWeights(weightOutPath);
 
 	std::cout << "\n========== Training Completed ==========" << std::endl;
 	std::cout << "Weights saved to: " << weightOutPath << std::endl;
-}
 
-Tensor test_forward(const Tensor &input)
-{
-	std::cout << "\n=== Testing Autoencoder Forward ===" << std::endl;
-	Autoencoder model;
-	MSELoss loss_fn;
-	Tensor truth_output = input; // Autoencoder cố gắng tái tạo lại đầu vào
-
-	Tensor h_output = model.forward(input, "host");
-	float h_loss = loss_fn.forward(h_output, input, "host");
-	std::cout << "Host Loss: " << h_loss << std::endl;
-	Tensor d_output = model.forward(input, "device");
-	float d_loss = loss_fn.forward(d_output, input, "device");
-	std::cout << "Device Loss: " << d_loss << std::endl;
-
-	Tensor h_grad = loss_fn.backward(h_output, input, "host");
-	h_grad = model.backward(h_grad, 0.001, "host");
-	Tensor d_grad = loss_fn.backward(d_output, input, "device");
-	d_grad = model.backward(d_grad, 0.001, "device");
-
-	compare(h_grad, d_grad);
-
-	std::cout << "Output (first 20 values):" << std::endl;
-	print_vector(h_grad.h_data, 20);
-	print_vector(d_grad.h_data, 20);
-
-	// Verify that host and device outputs match
-	compare(h_output, d_output);
-	std::cout << "Diff between Host and Device Loss: " << std::abs(h_loss - d_loss) << std::endl;
-	if (std::abs(h_loss - d_loss) < 1e-3)
-	{
-		std::cout << "Host and Device losses match!" << std::endl;
-	}
-	else
-	{
-		std::cout << "Host and Device losses do NOT match!" << std::endl;
-	}
-	return d_output;
+	gpu_batch_buffer.free_device();
 }
 int main(int argc, char *argv[])
 {

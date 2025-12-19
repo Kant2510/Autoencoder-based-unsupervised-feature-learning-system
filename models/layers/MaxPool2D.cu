@@ -1,9 +1,9 @@
 #include <vector>
 #include "MaxPool2D.h"
 
-Tensor MaxPool2D::forward(const Tensor &input, const std::string &device)
+void MaxPool2D::forward(const Tensor &input, const std::string &device)
 {
-	this->last_input = input;
+	this->last_input = &input;
 
 	int batch_size = input.batch;
 
@@ -39,7 +39,7 @@ Tensor MaxPool2D::forward(const Tensor &input, const std::string &device)
 		throw std::invalid_argument("Device must be 'host' or 'device'");
 	}
 
-	return this->cached_output;
+	// return this->cached_output;
 }
 
 void MaxPool2D::forward_loop_host(const Tensor &input, Tensor &output, int channels, int batch_size, int input_h, int input_w, int output_h, int output_w)
@@ -114,13 +114,13 @@ void MaxPool2D::forward_loop_device(const Tensor &input, Tensor &output, int cha
 	// output.to_host();
 }
 
-Tensor MaxPool2D::backward(const Tensor &grad_output, const std::string &device)
+void MaxPool2D::backward(const Tensor &grad_output, const std::string &device)
 {
 	// Tensor grad_input(last_input.batch, last_input.channels,
 	// 				  last_input.height, last_input.width);
 	this->cached_grad_input.reshape_if_needed(
-		last_input.batch, last_input.channels,
-		last_input.height, last_input.width);
+		last_input->batch, last_input->channels,
+		last_input->height, last_input->width);
 
 	int out_h = grad_output.height;
 	int out_w = grad_output.width;
@@ -137,8 +137,8 @@ Tensor MaxPool2D::backward(const Tensor &grad_output, const std::string &device)
 		// Initialize to zero directly on GPU
 		this->cached_grad_input.zeros("device");
 		backward_loop_device(grad_output, this->cached_grad_input,
-							 last_input.channels, last_input.batch,
-							 last_input.height, last_input.width,
+							 last_input->channels, last_input->batch,
+							 last_input->height, last_input->width,
 							 out_h, out_w);
 	}
 	else
@@ -146,7 +146,7 @@ Tensor MaxPool2D::backward(const Tensor &grad_output, const std::string &device)
 		throw std::invalid_argument("Device must be 'host' or 'device'");
 	}
 
-	return this->cached_grad_input;
+	// return this->cached_grad_input;
 }
 
 void MaxPool2D::backward_loop_host(const Tensor &grad_output, Tensor &grad_input, int output_h, int output_w)
